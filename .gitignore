@@ -1,3 +1,6 @@
+calib_data2
+onnx_model
+trt_model
 logs
 checkpoints
 *.pkl

@@ -1,8 +1,11 @@
 #  by yhpark 2023-07-20
 # tensorboard --logdir ./logs
 from utils import *
-from apex import amp
 from apex.contrib.sparsity import ASP
+from apex.optimizers import FusedAdam
+import os
+
+os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
 genDir("./model")
 genDir("./checkpoints")
 
@@ -12,7 +15,7 @@ def main():
     device = device_check()
 
     # 0. dataset
-    batch_size = 64
+    batch_size = 256
     workers = 8
     data_dir = "/mnt/h/dataset/imagenet100"  # dataset path
 
@@ -53,8 +56,9 @@ def main():
         batch_size=batch_size,
         shuffle=True,
         num_workers=workers,
-        pin_memory=True,
+        pin_memory=False,
         sampler=None,
+        drop_last=True
     )
 
     val_loader = torch.utils.data.DataLoader(
@@ -62,8 +66,9 @@ def main():
         batch_size=batch_size,
         shuffle=False,
         num_workers=workers,
-        pin_memory=True,
+        pin_memory=False,
         sampler=None,
+        drop_last=True
     )
 
     classes = train_dataset.classes
@@ -94,34 +99,23 @@ def main():
         )  # print output shape & total parameter sizes for given input size
 
     # 2. train
-    epochs = 20
+    epochs = 10
+    model_name += '_1'
     writer = SummaryWriter(f"logs/{model_name}")
+
+    use_amp = True
+    scaler = torch.cuda.amp.GradScaler(enabled=use_amp)
 
     # define loss function (criterion), optimizer, and learning rate scheduler
     criterion = nn.CrossEntropyLoss().to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-    # optimizer = torch.optim.SGD(model.parameters(), lr=0.01, momentum=0.9, weight_decay=1e-4)
-    # optimizer = torch.optim.RMSprop(model.parameters(), lr=0.01)
-    # scheduler = StepLR(optimizer, step_size=8, gamma=0.1)
-    scheduler = MultiStepLR(
-        optimizer, milestones=[int(epochs * 0.4), int(epochs * 0.8)], gamma=0.1
-    )
+    #optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    optimizer = FusedAdam(model.parameters(), lr=0.001)
+    scheduler = MultiStepLR(optimizer, milestones=[int(epochs * 0.2), int(epochs * 0.6)], gamma=0.1)
 
     ASP.prune_trained_model(model, optimizer)
 
     filename = f"./checkpoints/{model_name}_pruned_0.pth.tar"
     torch.save(model.state_dict(), filename)
-
-    # Initialize Amp.  Amp accepts either values or strings for the optional override arguments,
-    # for convenient interoperation with argparse.
-    # model, optimizer = amp.initialize(model, optimizer,
-    #                                   opt_level="O1",
-    #                                   cast_model_type=None,
-    #                                   patch_torch_functions=True,
-    #                                   keep_batchnorm_fp32=None,
-    #                                   master_weights=None,
-    #                                   loss_scale="dynamic"
-    #                                   )
 
     print("=> Model training has started!")
     best_acc1 = 0
@@ -134,8 +128,10 @@ def main():
             optimizer,
             epoch,
             device,
-            None,
+            scaler,
+            use_amp,
             writer,
+            None,
             10,
         )
 

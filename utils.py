@@ -37,12 +37,14 @@ def load_checkpoint(path, model, device):
         print(f"=> no checkpoint found at {path}")
 
 
-def set_random_seeds(random_seed=0):
+def set_random_seeds(random_seed=1):
     torch.manual_seed(random_seed)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
+    torch.cuda.manual_seed_all(random_seed)
     np.random.seed(random_seed)
     random.seed(random_seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
 
 
 def device_check():
@@ -179,15 +181,29 @@ color_map = [
 
 
 
-def train(train_loader, model, criterion, optimizer, epoch, device, amp, writer, print_freq=10):
-    batch_time = AverageMeter('Time', ':6.3f')
-    data_time = AverageMeter('data', ':6.3f')
-    losses = AverageMeter('Loss', ':.4e')
-    top1 = AverageMeter('Acc@1', ':6.2f')
-    top5 = AverageMeter('Acc@5', ':6.2f')
-    progress = ProgressMeter(len(train_loader), [batch_time, data_time, losses, top1, top5],
-                             prefix="Epoch: [{}]".format(epoch))
-
+def train(
+    train_loader,
+    model,
+    criterion,
+    optimizer,
+    epoch,
+    device,
+    scaler,
+    use_amp,
+    writer,
+    regularizer=None,
+    print_freq=10,
+):
+    batch_time = AverageMeter("Time", ":6.3f")
+    data_time = AverageMeter("data", ":6.3f")
+    losses = AverageMeter("Loss", ":.4e")
+    top1 = AverageMeter("Acc@1", ":6.2f")
+    top5 = AverageMeter("Acc@5", ":6.2f")
+    progress = ProgressMeter(
+        len(train_loader),
+        [batch_time, data_time, losses, top1, top5],
+        prefix="Epoch: [{}]".format(epoch),
+    )
     print_freq = len(train_loader) // print_freq
 
     # switch to train mode
@@ -203,8 +219,10 @@ def train(train_loader, model, criterion, optimizer, epoch, device, amp, writer,
         target = target.to(device, non_blocking=True)
 
         # compute output
-        output = model(images)
-        loss = criterion(output, target)
+        # with torch.autocast(device_type='cuda', dtype=torch.float16, enabled=use_amp):
+        with torch.autocast(device_type="cuda", enabled=use_amp):
+            output = model(images)
+            loss = criterion(output, target)
 
         # measure accuracy and record loss
         acc1, acc5 = accuracy(output, target, topk=(1, 5))
@@ -212,14 +230,18 @@ def train(train_loader, model, criterion, optimizer, epoch, device, amp, writer,
         top1.update(acc1[0], images.size(0))
         top5.update(acc5[0], images.size(0))
 
-        # compute gradient and do SGD step
+        # compute gradient and do optimizer step
         optimizer.zero_grad()
-        if amp is not None:
-            with amp.scale_loss(loss, optimizer) as scaled_loss:
-                scaled_loss.backward()
+        if use_amp:
+            scaler.scale(loss).backward()
+            if regularizer:
+                scaler.unscale_(optimizer)
+                regularizer(model)
+            scaler.step(optimizer)
+            scaler.update()
         else:
             loss.backward()
-        optimizer.step()
+            optimizer.step()
 
         # measure elapsed time
         batch_time.update(time.time() - end)
@@ -228,10 +250,13 @@ def train(train_loader, model, criterion, optimizer, epoch, device, amp, writer,
         if i % print_freq == 0:  # print_freq(10) 미니 배치 마다 출력
             progress.display(i + 1)
             writer.add_scalar("Loss/train", losses.val, epoch * len(train_loader) + i)
-            writer.add_scalar("Acc(top1)/train", int(top1.val), epoch * len(train_loader) + i)
-            writer.add_scalar("Acc(top5)/train", top5.val, epoch * len(train_loader) + i)
+            writer.add_scalar(
+                "Acc(top1)/train", int(top1.val), epoch * len(train_loader) + i
+            )
+            writer.add_scalar(
+                "Acc(top5)/train", top5.val, epoch * len(train_loader) + i
+            )
             writer.close()
-
 
 
 
@@ -348,8 +373,8 @@ def test(
         count = 0
         for i, (images, target) in enumerate(val_loader):
             if torch.cuda.is_available():
-                images = images.to(device, non_blocking=True)
-                target = target.to(device, non_blocking=True)
+                images = images.to(device, non_blocking=False)
+                target = target.to(device, non_blocking=False)
 
             # compute output
             begin = time.time()
