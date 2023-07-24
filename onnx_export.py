@@ -1,4 +1,4 @@
-#  by yhpark 2023-07-13
+#  by yhpark 2023-07-20
 # tensorboard --logdir ./logs
 from utils import *
 import onnx
@@ -50,8 +50,8 @@ def main():
     model = model.to(device)
 
     model_name = 'resnet18_1_pruned'
+    # model_name = 'resnet18'
     check_path = f"./checkpoints/{model_name}.pth.tar"
-
 
     ASP.init_model_for_pruning(model, mask_calculator="m4n2_1d", verbosity=2, whitelist=[torch.nn.Linear, torch.nn.Conv2d, torch.nn.MultiheadAttention], allow_recompute_mask=False)
 

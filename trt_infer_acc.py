@@ -1,4 +1,4 @@
-#  by yhpark 2023-07-17
+#  by yhpark 2023-07-21
 import tensorrt as trt
 import common
 from utils import *
@@ -137,17 +137,14 @@ def main():
     )
 
     classes = val_dataset.classes
-    class_to_idx = val_dataset.class_to_idx
     class_count = len(classes)
-
-    json_file = open("/mnt/h/dataset/imagenet100/Labels.json")
-    class_name = json.load(json_file)
 
     # 2. tensorrt model
     gen_force = False
     precision = "int8"  # fp32, fp16, int8
     model_name = "resnet18_1_pruned"
     #model_name = "resnet18_pruned"
+    #model_name = "resnet18"
 
     onnx_model_path = f"onnx_model/{model_name}.onnx"
     engine_file_path = f"trt_model/{model_name}.trt"
@@ -196,18 +193,11 @@ def main():
         print(f"acc1 : {acc1}")
 
     # 3. results
-
     print(engine_file_path)
     print(f"Using precision {precision} mode.")
     print(f"{iteration}th iteration time : {dur_time} [sec]")
     print(f"Average fps : {1/(dur_time/iteration)} [fps]")
     print(f"Average inference time : {(dur_time/iteration) * 1000} [msec]")
-    # max_tensor = torch.from_numpy(t_outputs[0]).max(dim=1)
-    # max_value = max_tensor[0].cpu().data.numpy()[0]
-    # max_index = max_tensor[1].cpu().data.numpy()[0]
-    # print(f"max index : {max_index}, value : {max_value}, class name : {classes[max_index]} {class_name.get(classes[max_index])}")
-    #
-
 
 if __name__ == "__main__":
     main()

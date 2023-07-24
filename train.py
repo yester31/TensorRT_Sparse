@@ -4,9 +4,7 @@ from utils import *
 from apex.contrib.sparsity import ASP
 from apex.optimizers import FusedAdam
 import os
-
 os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
-genDir("./model")
 genDir("./checkpoints")
 
 

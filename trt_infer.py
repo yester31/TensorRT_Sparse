@@ -1,4 +1,4 @@
-#  by yhpark 2023-07-17
+#  by yhpark 2023-07-20
 import tensorrt as trt
 import common
 from utils import *
@@ -137,7 +137,6 @@ def main():
     input_host = np.array(img, dtype=np.float32, order="C")
 
     classes = val_dataset.classes
-    class_to_idx = val_dataset.class_to_idx
     class_count = len(classes)
 
     json_file = open("/mnt/h/dataset/imagenet100/Labels.json")
@@ -148,6 +147,7 @@ def main():
     precision = "int8"  # fp32, fp16, int8
     model_name = "resnet18_1_pruned"
     #model_name = "resnet18_pruned"
+    #model_name = "resnet18"
 
     onnx_model_path = f"onnx_model/{model_name}.onnx"
     engine_file_path = f"trt_model/{model_name}.trt"
@@ -176,7 +176,7 @@ def main():
             )
         torch.cuda.synchronize()
 
-        for i in range(iteration):
+        for _ in range(iteration):
             begin = time.time()
             t_outputs = common.do_inference_v2(
                 context,
@@ -210,69 +210,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-# Using precision fp32 mode.
-# 10000th iteration time : 12.061801433563232 [sec]
-# Average fps : 829.0635569720082 [fps]
-# Average inference time : 1.2061801433563233 [msec]
-# Resnet18 max index : 99 , value : 21.666141510009766, class name : n02077923 sea lion
-
-# Using precision fp16 mode.
-# 10000th iteration time : 5.546254873275757 [sec]
-# Average fps : 1803.0184743554257 [fps]
-# Average inference time : 0.5546254873275757 [msec]
-# Resnet18 max index : 99 , value : 21.66958236694336, class name : n02077923 sea lion
-
-# Using TensorRT PTQ mode. with calibration data from coco dataset
-# trt_model/resnet18.trt
-# Using precision int8 mode.
-# 10000th iteration time : 4.211785316467285 [sec]
-# Average fps : 2374.2900572120543 [fps]
-# Average inference time : 0.4211785316467285 [msec]
-# max index : 99, value : 19.75248146057129, class name : n02077923 sea lion
-
-# Using TensorRT PTQ mode. with calibration data from imagenet dataset
-# trt_model/resnet18.trt
-# Using precision int8 mode.
-# 10000th iteration time : 4.193108558654785 [sec]
-# Average fps : 2384.865514478394 [fps]
-# Average inference time : 0.4193108558654785 [msec]
-# max index : 99, value : 21.4094295501709, class name : n02077923 sea lion
-
-
-# Using Pytorch Quantization [QAT] mode.
-# Using precision int8 mode.
-# 10000th iteration time : 5.898566961288452 [sec]
-# Average fps : 1695.3270286882785 [fps]
-# Average inference time : 0.5898566961288453 [msec]
-# Resnet18 max index : 99 , value : 21.456743240356445, class name : n02077923 sea lion
-
-# Using Pytorch Quantization [QAT2] mode.
-# Using precision int8 mode.
-# 10000th iteration time : 5.852148056030273 [sec]
-# Average fps : 1708.774266176609 [fps]
-# Average inference time : 0.5852148056030273 [msec]
-# Resnet18 max index : 99 , value : 23.088726043701172, class name : n02077923 sea lion
-
-# Using Pytorch Quantization [PTQ] mode.
-# Using precision int8 mode.
-# 10000th iteration time : 5.982958793640137 [sec]
-# Average fps : 1671.4138179641088 [fps]
-# Average inference time : 0.5982958793640136 [msec]
-# Resnet18 max index : 99 , value : 22.055187225341797, class name : n02077923 sea lion
-
-# Using Pytorch Quantization [PTQ2] mode.
-# Using precision int8 mode.
-# 10000th iteration time : 5.745854139328003 [sec]
-# Average fps : 1740.3852860715906 [fps]
-# Average inference time : 0.5745854139328003 [msec]
-# Resnet18 max index : 99 , value : 21.805843353271484, class name : n02077923 sea lion
-
-
-# prunning
-# Using precision fp32 mode.
-# 10000th iteration time : 12.801480054855347 [sec]
-# Average fps : 781.1596750648531 [fps]
-# Average inference time : 1.2801480054855345 [msec]
-# max index : 99, value : 12.337376594543457, class name : n02077923 sea lion
