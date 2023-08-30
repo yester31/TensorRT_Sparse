@@ -14,10 +14,11 @@
 
 ### 1. Development Environment
 - Device
-  - Windows 10 laptop
+  - MSI laptop
   - CPU i7-11375H
   - GPU RTX-3060
 - Dependency
+  - WSL(Ubuntu 22.04)
   - cuda 12.1
   - cudnn 8.9.2
   - tensorrt 8.6.1
